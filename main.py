@@ -50,24 +50,42 @@ def get_long_term_memory(username: str) -> str:
 
 
 async def extract_and_save_fact(username: str, user_message: str):
-    """Use Gemini to detect and save a memorable personal fact from the user's message."""
+    """Extract a long-term fact and/or a noticeboard post from the user's message."""
     extraction_prompt = f"""
-    Analyze this message from {username}.
-    Does it contain a permanent fact, preference, relationship, or important detail about them that a personal assistant should remember forever?
-    Message: "{user_message}"
+    Analyze this message from {username}. You have two tasks:
 
-    If YES, output ONLY the concise fact (e.g. "User's favorite color is blue." or "User has a dog named Max.").
-    If NO, output exactly "NONE".
+    1. FACT EXTRACTION: Does it contain a permanent fact or preference about them?
+    2. NOTICEBOARD: Did they explicitly ask to post something to the 'family board' or 'noticeboard'?
+
+    Respond STRICTLY in this format:
+    FACT: [The fact, or "NONE"]
+    BOARD_POST: [The message to post, or "NONE"]
     """
     try:
         response = await model.generate_content_async(extraction_prompt)
-        fact = response.text.strip()
-        if fact and fact != "NONE":
-            cursor.execute(
-                'INSERT INTO memory (username, user_fact) VALUES (?, ?)', (username, fact)
-            )
-            conn.commit()
-            print(f"Background Memory Saved for {username}: {fact}")
+        text = response.text.strip()
+
+        fact_line  = [l for l in text.split('\n') if l.startswith('FACT:')]
+        board_line = [l for l in text.split('\n') if l.startswith('BOARD_POST:')]
+
+        if fact_line:
+            fact = fact_line[0].replace('FACT:', '').strip()
+            if fact != "NONE":
+                cursor.execute(
+                    'INSERT INTO memory (username, user_fact) VALUES (?, ?)', (username, fact)
+                )
+                conn.commit()
+                print(f"Fact saved for {username}: {fact}")
+
+        if board_line:
+            board_msg = board_line[0].replace('BOARD_POST:', '').strip()
+            if board_msg != "NONE":
+                cursor.execute(
+                    'INSERT INTO family_board (author, message) VALUES (?, ?)', (username, board_msg)
+                )
+                conn.commit()
+                print(f"Noticeboard updated by {username}: {board_msg}")
+
     except Exception as e:
         print(f"Background extraction failed: {e}")
 
