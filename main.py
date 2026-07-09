@@ -161,6 +161,12 @@ async def start():
         welcome_msg = f"### {config['emoji']} Welcome back, **{username}**!\n***{bot_name}** is locked to your profile and ready to help.*"
         await cl.Message(content=welcome_msg, author=bot_name).send()
 
+    system_instruction += (
+        "\n\nIMPORTANT FEATURE: You have access to a 'Shared Family Noticeboard'. "
+        "If the user asks to post a message to the family, tell them you will save it to the board. "
+        "If they ask what is on the board, summarize the latest family updates for them."
+    )
+
     cl.user_session.set("history", [
         {"role": "user", "parts": [system_instruction]},
         {"role": "model", "parts": [f"System initialized. Ready to assist {username}."]}
