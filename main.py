@@ -16,14 +16,23 @@ cursor = conn.cursor()
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS memory (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_fact TEXT UNIQUE
+        username TEXT,
+        user_fact TEXT,
+        UNIQUE(username, user_fact)
     )
 ''')
+# Migrate existing table: add username column if it doesn't exist yet
+try:
+    cursor.execute('ALTER TABLE memory ADD COLUMN username TEXT')
+except sqlite3.OperationalError:
+    pass  # Column already exists
 conn.commit()
 
 
-def get_long_term_memory() -> str:
-    cursor.execute('SELECT user_fact FROM memory')
+def get_long_term_memory(username: str) -> str:
+    cursor.execute(
+        'SELECT user_fact FROM memory WHERE username = ?', (username,)
+    )
     facts = cursor.fetchall()
     if not facts:
         return ""
@@ -31,7 +40,7 @@ def get_long_term_memory() -> str:
     return f"Here are some things you should remember about me:\n{lines}"
 
 
-def extract_and_save_facts(user_message: str):
+def extract_and_save_facts(user_message: str, username: str):
     """Use Gemini to detect and save memorable personal facts from the user's message."""
     prompt = (
         f'Analyze this message and extract any personal facts about the user worth '
@@ -50,16 +59,28 @@ def extract_and_save_facts(user_message: str):
             fact = fact.strip()
             if fact:
                 cursor.execute(
-                    'INSERT OR IGNORE INTO memory (user_fact) VALUES (?)', (fact,)
+                    'INSERT OR IGNORE INTO memory (username, user_fact) VALUES (?, ?)',
+                    (username, fact)
                 )
         conn.commit()
     except Exception:
         pass  # Never let extraction errors interrupt the chat
 
 
+def get_username() -> str:
+    """Return the current user's identifier, falling back to the session ID."""
+    user = cl.context.session.user
+    if user and hasattr(user, "identifier"):
+        return user.identifier
+    return cl.context.session.id
+
+
 @cl.on_chat_start
 async def start():
-    long_term_memory = get_long_term_memory()
+    username = get_username()
+    cl.user_session.set("username", username)
+
+    long_term_memory = get_long_term_memory(username)
 
     system_prompt = (
         "You are Orion, my ultimate personal assistant. Be concise, sharp, and helpful."
@@ -77,6 +98,7 @@ async def start():
 @cl.on_message
 async def main(message: cl.Message):
     history = cl.user_session.get("history")
+    username = cl.user_session.get("username")
 
     # Build the prompt parts: text + any attached audio files
     current_prompt = [message.content]
@@ -95,7 +117,7 @@ async def main(message: cl.Message):
     # Run fact extraction and response generation in parallel
     response, _ = await asyncio.gather(
         asyncio.to_thread(model.generate_content, history),
-        asyncio.to_thread(extract_and_save_facts, message.content),
+        asyncio.to_thread(extract_and_save_facts, message.content, username),
     )
 
     history.append({"role": "model", "parts": [response.text]})
