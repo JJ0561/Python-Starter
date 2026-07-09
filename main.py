@@ -25,6 +25,16 @@ try:
     cursor.execute('ALTER TABLE memory ADD COLUMN username TEXT')
 except sqlite3.OperationalError:
     pass  # Column already exists
+
+# Shared family board
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS family_board (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        author TEXT,
+        message TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+''')
 conn.commit()
 
 
