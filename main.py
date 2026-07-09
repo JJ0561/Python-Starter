@@ -67,17 +67,22 @@ def extract_and_save_facts(user_message: str, username: str):
         pass  # Never let extraction errors interrupt the chat
 
 
-def get_username() -> str:
-    """Return the current user's identifier, falling back to the session ID."""
-    user = cl.context.session.user
-    if user and hasattr(user, "identifier"):
-        return user.identifier
-    return cl.context.session.id
+@cl.password_auth_callback
+async def auth_callback(username: str, password: str):
+    family_accounts = {
+        "JJ": "admin123",
+        "Mom": "family",
+        "Brother": "family",
+    }
+    if username in family_accounts and family_accounts[username] == password:
+        return cl.User(identifier=username)
+    return None
 
 
 @cl.on_chat_start
 async def start():
-    username = get_username()
+    user = cl.user_session.get("user")
+    username = user.identifier
     cl.user_session.set("username", username)
 
     long_term_memory = get_long_term_memory(username)
@@ -92,7 +97,7 @@ async def start():
         {"role": "user", "parts": [system_prompt]},
         {"role": "model", "parts": ["Understood. Orion online. How can I help you today?"]}
     ])
-    await cl.Message(content="Orion initialized. Ready to assist.").send()
+    await cl.Message(content=f"Welcome back, **{username}**. Orion is online and locked to your profile.").send()
 
 
 @cl.on_message
