@@ -86,19 +86,39 @@ async def start():
     username = user.identifier
     cl.user_session.set("username", username)
 
-    long_term_memory = get_long_term_memory(username)
+    if username == "JJ":
+        # God mode: full read access to the entire family database
+        cursor.execute('SELECT username, user_fact FROM memory')
+        all_facts = cursor.fetchall()
 
-    system_prompt = (
-        "You are Orion, my ultimate personal assistant. Be concise, sharp, and helpful."
-    )
-    if long_term_memory:
-        system_prompt += f"\n\n{long_term_memory}"
+        system_instruction = "You are JJ's Master Assistant. You have full read/write access to the entire family's database.\n"
+        if all_facts:
+            system_instruction += "Here is the current family database context:\n"
+            for fact in all_facts:
+                system_instruction += f"- {fact[0]}'s data: {fact[1]}\n"
 
-    cl.user_session.set("history", [
-        {"role": "user", "parts": [system_prompt]},
-        {"role": "model", "parts": ["Understood. Orion online. How can I help you today?"]}
-    ])
-    await cl.Message(content=f"Welcome back, **{username}**. Orion is online and locked to your profile.").send()
+        cl.user_session.set("history", [
+            {"role": "user", "parts": [system_instruction]},
+            {"role": "model", "parts": ["Master privileges acknowledged. I am ready to manage the family fleet."]}
+        ])
+        await cl.Message(content=f"Welcome back, Commander **{username}**. Master access granted. I can see the whole family's data.").send()
+
+    else:
+        # Sandboxed mode: only this user's facts
+        cursor.execute('SELECT user_fact FROM memory WHERE username = ?', (username,))
+        user_facts = cursor.fetchall()
+
+        system_instruction = f"You are {username}'s personal assistant. You only know facts about them.\n"
+        if user_facts:
+            system_instruction += "Here is your memory bank regarding this user:\n"
+            for fact in user_facts:
+                system_instruction += f"- {fact[0]}\n"
+
+        cl.user_session.set("history", [
+            {"role": "user", "parts": [system_instruction]},
+            {"role": "model", "parts": [f"Ready to assist {username}."]}
+        ])
+        await cl.Message(content=f"Welcome back, **{username}**. Orion is online and locked to your profile.").send()
 
 
 @cl.on_message
