@@ -73,6 +73,7 @@ async def auth_callback(username: str, password: str):
         "JJ": "admin123",
         "Mom": "family",
         "Brother": "family",
+        "Sister": "family",
     }
     if username in family_accounts and family_accounts[username] == password:
         return cl.User(identifier=username)
