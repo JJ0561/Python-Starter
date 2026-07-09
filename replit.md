@@ -1,15 +1,12 @@
-# [Project name]
+# Python Project
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A blank Python project with Chainlit, Google Generative AI, and Ollama.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `source .venv/bin/activate && python main.py` — run the main script
+- `source .venv/bin/activate && chainlit run main.py` — run as a Chainlit app (if applicable)
+- Packages are installed in `.venv/` (virtual environment)
 
 ## Stack
 
