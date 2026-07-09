@@ -77,7 +77,20 @@ async def start():
 @cl.on_message
 async def main(message: cl.Message):
     history = cl.user_session.get("history")
-    history.append({"role": "user", "parts": [message.content]})
+
+    # Build the prompt parts: text + any attached audio files
+    current_prompt = [message.content]
+    if message.elements:
+        for element in message.elements:
+            if "audio" in element.mime:
+                with open(element.path, "rb") as f:
+                    audio_data = f.read()
+                current_prompt.append({
+                    "mime_type": element.mime,
+                    "data": audio_data
+                })
+
+    history.append({"role": "user", "parts": current_prompt})
 
     # Run fact extraction and response generation in parallel
     response, _ = await asyncio.gather(
