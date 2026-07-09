@@ -67,8 +67,8 @@ async def auth_callback(username: str, password: str):
     family_accounts = {
         "JJ": "admin123",
         "Mom": "family",
-        "Brother": "family",
-        "Sister": "family",
+        "Chris": "family",
+        "Ticara": "family",
     }
     if username in family_accounts and family_accounts[username] == password:
         return cl.User(identifier=username)
@@ -81,39 +81,80 @@ async def start():
     username = user.identifier
     cl.user_session.set("username", username)
 
+    design_configs = {
+        "JJ":     {"bot_name": "Orion Prime",    "emoji": "🧠", "welcome_color": "black"},
+        "Mom":    {"bot_name": "Orion - Casa",   "emoji": "🏖️", "welcome_color": "coral"},
+        "Chris":  {"bot_name": "Orion - AIS",    "emoji": "🍻", "welcome_color": "darkred"},
+        "Ticara": {"bot_name": "Orion - Striker","emoji": "⚽", "welcome_color": "teal"},
+    }
+
+    config   = design_configs.get(username, {"bot_name": "Orion", "emoji": "🤖", "welcome_color": "gray"})
+    bot_name = config["bot_name"]
+    cl.user_session.set("bot_name", bot_name)
+
+    await cl.Avatar(
+        name=bot_name,
+        url=f"https://api.dicebear.com/7.x/bottts/svg?seed={bot_name}&backgroundColor={config['welcome_color']}"
+    ).send()
+
     if username == "JJ":
-        # God mode: full read access to the entire family database
         cursor.execute('SELECT username, user_fact FROM memory')
         all_facts = cursor.fetchall()
 
-        system_instruction = "You are JJ's Master Assistant. You have full read/write access to the entire family's database.\n"
+        system_instruction = (
+            f"You are {bot_name}, JJ's Master Assistant. You have full read/write access to the entire family's database.\n"
+            "Your tone is sharp, technical, and highly efficient. "
+            "You know JJ is focused on mastering autonomous AI agents, automating operations with scripts, and optimizing social media strategy. "
+            "You are ready to assist with high-level event management or just cue up some upbeat tunes while he works.\n"
+        )
         if all_facts:
             system_instruction += "Here is the current family database context:\n"
             for fact in all_facts:
                 system_instruction += f"- {fact[0]}'s data: {fact[1]}\n"
 
-        cl.user_session.set("history", [
-            {"role": "user", "parts": [system_instruction]},
-            {"role": "model", "parts": ["Master privileges acknowledged. I am ready to manage the family fleet."]}
-        ])
-        await cl.Message(content=f"Welcome back, Commander **{username}**. Master access granted. I can see the whole family's data.").send()
+        welcome_msg = f"### {config['emoji']} Welcome to the Bridge, Commander **{username}**.\n*Master access granted. **{bot_name}** is online and syncing with the family fleet.*"
+        await cl.Message(content=welcome_msg, author=bot_name).send()
 
     else:
-        # Sandboxed mode: only this user's facts
         cursor.execute('SELECT user_fact FROM memory WHERE username = ?', (username,))
         user_facts = cursor.fetchall()
 
-        system_instruction = f"You are {username}'s personal assistant. You only know facts about them.\n"
+        system_instruction = f"You are {bot_name}, {username}'s personal assistant.\n"
+
+        if username == "Mom":
+            system_instruction += (
+                "Your tone should be warm, supportive, and slightly Italian-inspired. "
+                "You know that her absolute world revolves around her three kids: Chris, JJ, and Ticara, "
+                "as well as her beloved sausage dog, Saeabi. "
+                "Whenever appropriate, you love using metaphors related to the beach, the ocean, or the beauty of Italy.\n"
+            )
+        elif username == "Chris":
+            system_instruction += (
+                "Your tone is direct, relaxed, and a bit 'bloke-ish'. "
+                "You know he loves cars and grabbing beers with his mates, and you act as a solid wingman. "
+                "Crucially, you know he co-runs an electronic security business called AIS with his brother, JJ. "
+                "You are always ready to help him organize a night out or strategize on business operations.\n"
+            )
+        elif username == "Ticara":
+            system_instruction += (
+                "Your tone should be practical, grounded, and energetic. "
+                "You know she is a hardworking plumber who is incredibly passionate about playing soccer. "
+                "She shares a very close bond with her brother, JJ. "
+                "You naturally and subtly affirm her lesbian identity, keeping your advice and conversational tone supportive of her lifestyle and community.\n"
+            )
+
         if user_facts:
             system_instruction += "Here is your memory bank regarding this user:\n"
             for fact in user_facts:
                 system_instruction += f"- {fact[0]}\n"
 
-        cl.user_session.set("history", [
-            {"role": "user", "parts": [system_instruction]},
-            {"role": "model", "parts": [f"Ready to assist {username}."]}
-        ])
-        await cl.Message(content=f"Welcome back, **{username}**. Orion is online and locked to your profile.").send()
+        welcome_msg = f"### {config['emoji']} Welcome back, **{username}**!\n***{bot_name}** is locked to your profile and ready to help.*"
+        await cl.Message(content=welcome_msg, author=bot_name).send()
+
+    cl.user_session.set("history", [
+        {"role": "user", "parts": [system_instruction]},
+        {"role": "model", "parts": [f"System initialized. Ready to assist {username}."]}
+    ])
 
 
 @cl.on_message
@@ -144,4 +185,5 @@ async def main(message: cl.Message):
     history.append({"role": "model", "parts": [response.text]})
     cl.user_session.set("history", history)
 
-    await cl.Message(content=response.text).send()
+    bot_name = cl.user_session.get("bot_name", "Orion")
+    await cl.Message(content=response.text, author=bot_name).send()
