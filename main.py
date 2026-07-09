@@ -1,5 +1,4 @@
 import asyncio
-import json
 import sqlite3
 import os
 
@@ -40,31 +39,27 @@ def get_long_term_memory(username: str) -> str:
     return f"Here are some things you should remember about me:\n{lines}"
 
 
-def extract_and_save_facts(user_message: str, username: str):
-    """Use Gemini to detect and save memorable personal facts from the user's message."""
-    prompt = (
-        f'Analyze this message and extract any personal facts about the user worth '
-        f'remembering long-term (name, job, preferences, habits, goals, relationships, etc.).\n\n'
-        f'Message: "{user_message}"\n\n'
-        f'Return a JSON array of concise third-person statements '
-        f'(e.g. ["The user\'s name is Alex", "The user prefers Python over JavaScript"]). '
-        f'If there are no memorable facts, return []. '
-        f'Return ONLY the JSON array, no markdown, no explanation.'
-    )
+async def extract_and_save_fact(username: str, user_message: str):
+    """Use Gemini to detect and save a memorable personal fact from the user's message."""
+    extraction_prompt = f"""
+    Analyze this message from {username}.
+    Does it contain a permanent fact, preference, relationship, or important detail about them that a personal assistant should remember forever?
+    Message: "{user_message}"
+
+    If YES, output ONLY the concise fact (e.g. "User's favorite color is blue." or "User has a dog named Max.").
+    If NO, output exactly "NONE".
+    """
     try:
-        response = model.generate_content(prompt)
-        text = response.text.strip().strip("```json").strip("```").strip()
-        facts = json.loads(text)
-        for fact in facts:
-            fact = fact.strip()
-            if fact:
-                cursor.execute(
-                    'INSERT OR IGNORE INTO memory (username, user_fact) VALUES (?, ?)',
-                    (username, fact)
-                )
-        conn.commit()
-    except Exception:
-        pass  # Never let extraction errors interrupt the chat
+        response = await model.generate_content_async(extraction_prompt)
+        fact = response.text.strip()
+        if fact and fact != "NONE":
+            cursor.execute(
+                'INSERT INTO memory (username, user_fact) VALUES (?, ?)', (username, fact)
+            )
+            conn.commit()
+            print(f"Background Memory Saved for {username}: {fact}")
+    except Exception as e:
+        print(f"Background extraction failed: {e}")
 
 
 @cl.password_auth_callback
@@ -143,7 +138,7 @@ async def main(message: cl.Message):
     # Run fact extraction and response generation in parallel
     response, _ = await asyncio.gather(
         asyncio.to_thread(model.generate_content, history),
-        asyncio.to_thread(extract_and_save_facts, message.content, username),
+        extract_and_save_fact(username, message.content),
     )
 
     history.append({"role": "model", "parts": [response.text]})
